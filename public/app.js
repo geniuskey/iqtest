@@ -104,6 +104,39 @@
     return `<div class="matrix">${cells.map((c) => `<div>${c}</div>`).join('')}<div class="missing">${missingHtml}</div></div>`;
   }
 
+  // ------------------------------------------------------------ 광고 (애드센스)
+  // 광고는 랜딩·분석 중·결과 화면에만 둔다. 문제 풀이 화면에는 넣지 않는다
+  // (보기를 누르다 광고를 잘못 누르기 쉬운 배치는 애드센스 정책 위반 소지가 있다).
+
+  const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
+
+  function adSlot() {
+    const ads = config && config.adsense;
+    if (!ads) {
+      return isLocal ? '<div class="ad"><div class="ad-label">광고</div><div class="ad-placeholder">광고 영역 (ADSENSE_CLIENT 설정 시 표시)</div></div>' : '';
+    }
+    if (!ads.slot) return ''; // 슬롯 없이 클라이언트 ID만 있으면 자동 광고에 맡긴다
+    return `<div class="ad"><div class="ad-label">광고</div><ins class="adsbygoogle" style="display:block" data-ad-client="${esc(ads.client)}" data-ad-slot="${esc(ads.slot)}" data-ad-format="auto" data-full-width-responsive="true"></ins></div>`;
+  }
+
+  // SPA라서 화면을 새로 그릴 때마다 새 광고 칸을 채워 달라고 요청해야 한다
+  function fillAds() {
+    if (!config || !config.adsense || !window.adsbygoogle) return;
+    $app.querySelectorAll('ins.adsbygoogle:not([data-adsbygoogle-status])').forEach(() => {
+      try { window.adsbygoogle.push({}); } catch { /* 광고 차단기 등 */ }
+    });
+  }
+
+  function loadAdsense() {
+    if (!config.adsense) return;
+    window.adsbygoogle = window.adsbygoogle || [];
+    const s = document.createElement('script');
+    s.async = true;
+    s.crossOrigin = 'anonymous';
+    s.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(config.adsense.client)}`;
+    document.head.appendChild(s);
+  }
+
   // ------------------------------------------------------------ 라우팅
 
   async function route() {
@@ -111,13 +144,14 @@
     $topSlot.innerHTML = '';
     window.scrollTo(0, 0);
     const hash = location.hash.replace(/^#/, '') || '/';
-    const [, view, id] = hash.split('/');
+    const [, view, id, step] = hash.split('/');
     try {
       if (!view) return await renderLanding();
       if (view === 'intro') return renderIntro();
       if (view === 'test') return await renderTest();
       if (view === 'analyzing') return await renderAnalyzing(id);
-      if (view === 'result') return await renderResult(id);
+      if (view === 'result') return await renderResult(id, step);
+      if (view === 'privacy') return renderPrivacy();
       location.hash = '#/';
     } catch (e) {
       $app.innerHTML = `<div class="intro card"><h2>문제가 발생했어요</h2><p class="error">${esc(e.message)}</p><a class="btn btn-ghost" href="#/">처음으로</a></div>`;
@@ -133,7 +167,7 @@
     $app.innerHTML = `
       <section class="hero">
         <div>
-          <span class="pill">무료 응시 · 약 ${Math.round(config.durationSec / 60)}분</span>
+          <span class="pill">${config.free ? '100% 무료' : '무료 응시'} · 약 ${Math.round(config.durationSec / 60)}분</span>
           <h1>나의 <em>IQ</em>는<br/>상위 몇 %일까?</h1>
           <p class="lead">언어·지식과 무관한 ${config.questionCount}개의 시각 패턴 문제로<br/>순수한 추론 능력을 측정합니다.</p>
           <a class="btn btn-primary btn-lg" href="#/intro">테스트 시작하기 →</a>
@@ -153,12 +187,14 @@
         </div>
       </section>
 
+      ${adSlot()}
+
       <section class="section">
         <h2 class="section-title">진행 방법</h2>
         <div class="grid-3 steps">
           <div class="card step"><h3>${config.questionCount}문항 풀기</h3><p>제한 시간 ${Math.round(config.durationSec / 60)}분 동안 최대한 많은 문제를 풀어 보세요.</p></div>
           <div class="card step"><h3>무료로 순위 확인</h3><p>전체 응시자 중 나의 위치(상위 %)를 바로 알려드려요.</p></div>
-          <div class="card step"><h3>정밀 리포트</h3><p>정확한 IQ 점수, 영역별 분석, 문제별 해설, 인증서를 받아보세요.</p></div>
+          <div class="card step"><h3>${config.free ? '무료 정밀 리포트' : '정밀 리포트'}</h3><p>정확한 IQ 점수, 영역별 분석, 문제별 해설, 인증서를 받아보세요.</p></div>
         </div>
       </section>
 
@@ -171,6 +207,7 @@
       </section>
       <div class="center section"><a class="btn btn-primary btn-lg" href="#/intro">지금 무료로 시작하기 →</a></div>
     `;
+    fillAds();
     api('/api/sample').then((q) => {
       const el = document.getElementById('sample');
       if (el) el.innerHTML = `${matrixHtml(q.cells)}<div class="caption">예시 문제 — 빈칸에 들어갈 그림은?</div>`;
@@ -360,7 +397,9 @@
         <h2>결과를 분석하고 있어요</h2>
         <p class="muted">잠시만 기다려 주세요…</p>
         <ol>${steps.map((t) => `<li>${t}</li>`).join('')}</ol>
-      </div>`;
+      </div>
+      ${adSlot()}`;
+    fillAds();
     const items = $app.querySelectorAll('li');
     for (let i = 0; i < items.length; i++) {
       await sleep(650);
@@ -368,16 +407,19 @@
       items[i].classList.add('on');
     }
     await sleep(500);
-    if (location.hash.startsWith('#/analyzing')) location.replace(`#/result/${resultId}`);
+    if (location.hash.startsWith('#/analyzing')) location.replace(`#/result/${resultId}/rank`);
   }
 
   // ------------------------------------------------------------ 결과
 
-  async function renderResult(id) {
+  // step === 'rank': 테스트 직후 순위만 먼저 보여주는 단계 (무료 모드에서도 한 번 거친다)
+  async function renderResult(id, step) {
     $app.innerHTML = '<div class="analyzing"><div class="spinner"></div></div>';
     const r = await api(`/api/results/${encodeURIComponent(id)}`);
     storage.set(LS_LAST_RESULT, r.id);
-    if (r.paid) renderFull(r); else renderTeaser(r);
+    if (r.unlocked && !(config.free && step === 'rank')) renderFull(r);
+    else renderTeaser(r);
+    fillAds();
   }
 
   // 무료 결과 문구: 평균 이상은 "상위 N% 이내", 평균 미만은 "하위 N% 이내"
@@ -406,7 +448,7 @@
           <div class="rank">${rankLabel(r.teaser.range)}</div>
           <p class="sub">에 해당합니다.</p>
           ${bellSvg({ band })}
-          <p class="muted small">색칠된 구간이 당신이 속한 범위예요. 정확한 위치는 정밀 리포트에서 확인할 수 있어요.</p>
+          <p class="muted small">색칠된 구간이 당신이 속한 범위예요. 정확한 위치는 ${config.free ? '아래 버튼을 눌러' : '정밀 리포트에서'} 확인할 수 있어요.</p>
           <div class="stat-row">
             <div class="stat"><b>${r.answeredCount}/${r.total}</b><span>응답한 문항</span></div>
             <div class="stat"><b>${mmss(r.elapsedSec)}</b><span>소요 시간</span></div>
@@ -427,7 +469,9 @@
           </div>
         </div>
 
-        <div class="card paywall" id="paywall">
+        ${adSlot()}
+
+        ${config.free ? revealCard(r) : `<div class="card paywall" id="paywall">
           <h2>내 IQ 점수를 확인하세요</h2>
           <p class="muted">테스트 결과는 이미 계산되어 있어요. 정밀 리포트를 열면 아래 내용을 모두 볼 수 있습니다.</p>
           <ul class="benefits">
@@ -449,9 +493,27 @@
           <button class="btn btn-primary btn-lg btn-block" id="pay">${won(r.price)} 결제하고 IQ 확인하기</button>
           <div class="trust"><span>🔐 안전한 결제</span><span>⚡ 결제 즉시 확인</span><span>🔗 결과 링크 영구 보관</span></div>
           <p class="muted small" style="margin-top:12px">결제 후 리포트가 즉시 제공되는 디지털 콘텐츠로, 제공 이후에는 청약철회가 제한될 수 있습니다. 결과 링크를 저장해 두면 언제든 다시 볼 수 있어요.</p>
-        </div>
+        </div>`}
       </div>`;
-    document.getElementById('pay').onclick = (e) => startPayment(r, e.target);
+    const payBtn = document.getElementById('pay');
+    if (payBtn) payBtn.onclick = (e) => startPayment(r, e.target);
+  }
+
+  // 무료 모드: 결제 대신 "확인하기" 버튼 한 번 — 순위로 궁금증을 만든 뒤 리포트로 넘어간다
+  function revealCard(r) {
+    return `
+        <div class="card paywall" id="reveal">
+          <h2>결과 리포트가 준비됐어요</h2>
+          <p class="muted">버튼을 누르면 아래 내용을 모두 무료로 볼 수 있어요.</p>
+          <ul class="benefits">
+            <li><b>정확한 IQ 점수</b>와 백분위</li>
+            <li>분포 그래프 상의 <b>정확한 내 위치</b></li>
+            <li><b>4개 영역</b>(패턴·공간·수리·논리) 및 난이도별 정답률</li>
+            <li><b>${r.total}문항 전체 정답 해설</b></li>
+            <li>이름이 들어간 <b>IQ 인증서</b> 이미지 다운로드</li>
+          </ul>
+          <a class="btn btn-primary btn-lg btn-block" id="reveal-btn" href="#/result/${esc(r.id)}">내 IQ 확인하기 (무료) →</a>
+        </div>`;
   }
 
   // ------------------------------------------------------------ 결제
@@ -586,6 +648,8 @@
           </div>
         </div>
 
+        ${adSlot()}
+
         <div class="card result-section">
           <h2>영역별 분석</h2>
           <div class="preview-list">
@@ -612,10 +676,12 @@
           <p class="muted small">결과 링크를 저장해 두면 언제든 이 리포트를 다시 볼 수 있어요.</p>
         </div>
 
+        ${adSlot()}
+
         <div class="card result-section">
           <h2>문제별 해설</h2>
           <p class="muted small">초록색 테두리가 정답, 빨간색 테두리가 내가 고른 오답입니다.</p>
-          ${r.review.map(reviewItem).join('')}
+          ${r.review.map((q, i) => reviewItem(q) + (i % 10 === 9 && i < r.review.length - 1 ? adSlot() : '')).join('')}
         </div>
         <div class="center section"><a class="btn btn-ghost" href="#/intro">다시 테스트하기</a></div>
       </div>`;
@@ -752,6 +818,27 @@
     ctx.restore();
   }
 
+  // ------------------------------------------------------------ 개인정보처리방침
+  // 애드센스 승인에는 쿠키·광고 관련 고지를 담은 개인정보처리방침 페이지가 필요하다.
+
+  function renderPrivacy() {
+    $app.innerHTML = `
+      <div class="intro card policy">
+        <h1>개인정보처리방침</h1>
+        <h3>1. 수집하는 정보</h3>
+        <p>본 서비스는 회원가입 없이 이용할 수 있으며, 이름·이메일·전화번호 등 개인을 식별할 수 있는 정보를 수집하지 않습니다. 테스트 응답, 점수, 응시 시각은 결과 제공과 점수 기준(규준) 보정을 위해 익명으로 저장됩니다. 인증서에 입력한 이름은 서버로 전송되지 않고 사용자의 브라우저에서만 처리됩니다.</p>
+        <h3>2. 브라우저 저장소</h3>
+        <p>진행 중인 테스트와 최근 결과 링크를 이어서 볼 수 있도록 브라우저의 로컬 저장소(localStorage)를 사용합니다. 브라우저 설정에서 언제든 삭제할 수 있습니다.</p>
+        <h3>3. 광고와 쿠키</h3>
+        <p>본 서비스는 Google 애드센스 광고를 게재합니다. Google을 포함한 제3자 광고 사업자는 쿠키를 사용해 사용자의 이 사이트 및 다른 사이트 방문 기록을 기반으로 광고를 게재할 수 있습니다. 맞춤 광고는 <a href="https://adssettings.google.com" target="_blank" rel="noopener">Google 광고 설정</a>에서 해제할 수 있으며, 자세한 내용은 <a href="https://policies.google.com/technologies/ads" target="_blank" rel="noopener">Google 광고 정책</a>을 참고하세요.</p>
+        <h3>4. 보관 기간</h3>
+        <p>익명 결과 데이터는 서비스 운영 기간 동안 보관되며, 개인을 식별할 수 없는 통계 목적으로만 이용됩니다.</p>
+        <h3>5. 문의</h3>
+        <p>개인정보 관련 문의는 사이트 운영자에게 연락해 주세요.</p>
+        <a class="btn btn-ghost" href="#/">처음으로</a>
+      </div>`;
+  }
+
   // ------------------------------------------------------------ 모달
 
   function openModal(html, handlers = {}) {
@@ -778,6 +865,7 @@
       closeModal();
       route();
     });
+    loadAdsense();
     if (await handlePaymentRedirect()) return;
     route();
   }

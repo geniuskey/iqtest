@@ -6,8 +6,8 @@ const { createApp, loadConfig } = require('../server');
 const { generateTest } = require('../lib/puzzles');
 const { toIq, teaserBucket } = require('../lib/scoring');
 
-function startServer() {
-  const config = { ...loadConfig({}), dataFile: null, port: 0 };
+function startServer(overrides = {}) {
+  const config = { ...loadConfig({}), dataFile: null, port: 0, ...overrides };
   const app = createApp(config);
   return new Promise((resolve) => {
     app.server.listen(0, () => {
@@ -31,8 +31,8 @@ test('IQ 환산: 평균 정답률은 100 근처, 높을수록 IQ가 높다', () 
   assert.strictEqual(teaserBucket(99.5).topPercent, 1);
 });
 
-test('전체 흐름: 응시 → 무료 결과(IQ 숨김) → 결제 → 전체 리포트', async () => {
-  const app = await startServer();
+test('유료 모드 전체 흐름: 응시 → 무료 결과(IQ 숨김) → 결제 → 전체 리포트', async () => {
+  const app = await startServer({ provider: 'mock' });
   try {
     const session = await app.call('/api/sessions', {});
     assert.strictEqual(session.status, 200);
@@ -96,5 +96,43 @@ test('정적 파일과 SPA 라우팅, 경로 탐색 차단', async () => {
     assert.strictEqual((await fetch(`${base}/api/results/nope`)).status, 404);
   } finally {
     await app.close();
+  }
+});
+
+test('무료 모드(기본값): 결제 없이 전체 리포트 공개, 주문은 거부', async () => {
+  const app = await startServer();
+  try {
+    const cfg = await app.call('/api/config');
+    assert.strictEqual(cfg.body.free, true);
+    assert.strictEqual(cfg.body.adsense, null);
+    const { sessionId } = (await app.call('/api/sessions', {})).body;
+    const { resultId } = (await app.call(`/api/sessions/${sessionId}/submit`, { answers: [0, 1, 2] })).body;
+    const r = await app.call(`/api/results/${resultId}`);
+    assert.strictEqual(r.body.unlocked, true);
+    assert.strictEqual(r.body.paid, false);
+    assert.ok(Number.isInteger(r.body.iq));
+    assert.strictEqual(r.body.review.length, 30);
+    const order = await app.call(`/api/results/${resultId}/orders`, {});
+    assert.strictEqual(order.status, 400);
+  } finally {
+    await app.close();
+  }
+});
+
+test('애드센스 설정 시 config와 ads.txt 제공', async () => {
+  const app = await startServer({ adsenseClient: 'ca-pub-1234567890', adsenseSlot: '111' });
+  try {
+    const cfg = await app.call('/api/config');
+    assert.deepStrictEqual(cfg.body.adsense, { client: 'ca-pub-1234567890', slot: '111' });
+    const res = await fetch(`http://127.0.0.1:${app.server.address().port}/ads.txt`);
+    assert.strictEqual(await res.text(), 'google.com, pub-1234567890, DIRECT, f08c47fec0942fa0\n');
+  } finally {
+    await app.close();
+  }
+  const noAds = await startServer();
+  try {
+    assert.strictEqual((await fetch(`http://127.0.0.1:${noAds.server.address().port}/ads.txt`)).status, 404);
+  } finally {
+    await noAds.close();
   }
 });

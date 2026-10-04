@@ -18,7 +18,10 @@ function loadConfig(env = process.env) {
     durationSec: Number(env.TEST_DURATION_SEC || 25 * 60),
     calibrationMin: Number(env.CALIBRATION_MIN || 300),
     dataFile: env.DATA_FILE === '' ? null : env.DATA_FILE || path.join(__dirname, 'data', 'db.json'),
-    provider: env.PAYMENT_PROVIDER || 'mock',
+    // none: 전부 무료 + 광고 수익 / mock: 테스트 결제 / toss: 토스페이먼츠 실결제
+    provider: env.PAYMENT_PROVIDER || 'none',
+    adsenseClient: env.ADSENSE_CLIENT || null,
+    adsenseSlot: env.ADSENSE_SLOT || null,
     tossClientKey: env.TOSS_CLIENT_KEY,
     tossSecretKey: env.TOSS_SECRET_KEY,
   };
@@ -48,6 +51,7 @@ function createApp(config = loadConfig()) {
   const store = new Store(config.dataFile);
   const payments = createPaymentProvider(config);
   const newId = () => crypto.randomBytes(12).toString('base64url');
+  const free = payments.name === 'none';
 
   // ------------------------------------------------------------ 핸들러
 
@@ -57,6 +61,8 @@ function createApp(config = loadConfig()) {
       listPrice: config.listPrice,
       provider: payments.name,
       clientKey: payments.clientKey,
+      free,
+      adsense: config.adsenseClient ? { client: config.adsenseClient, slot: config.adsenseSlot } : null,
       durationSec: config.durationSec,
       questionCount: SCHEDULE.length,
       optionCount: OPTION_COUNT,
@@ -126,12 +132,13 @@ function createApp(config = loadConfig()) {
       teaser: teaserBucket(r.percentile),
       categoryLabels: Object.fromEntries(Object.entries(r.categories).map(([k, v]) => [k, v.label])),
       paid: r.paid,
+      unlocked: r.paid || free,
       price: config.price,
       listPrice: config.listPrice,
     };
-    if (!r.paid) return base;
+    if (!base.unlocked) return base;
 
-    // 결제 완료: 전체 리포트 + 문제별 해설
+    // 결제 완료(또는 무료 모드): 전체 리포트 + 문제별 해설
     const session = store.get('sessions', r.sessionId);
     const questions = generateTest(session.seed);
     return {
@@ -158,6 +165,7 @@ function createApp(config = loadConfig()) {
   function createOrder(resultId, body) {
     const r = store.get('results', resultId);
     if (!r) throw new HttpError(404, 'RESULT_NOT_FOUND', '결과를 찾을 수 없습니다.');
+    if (free) throw new HttpError(400, 'PAYMENT_DISABLED', '무료 모드에서는 결제가 필요 없습니다.');
     if (r.paid) throw new HttpError(409, 'ALREADY_PAID', '이미 결제가 완료된 결과입니다.');
     const name = typeof body.name === 'string' ? body.name.trim().slice(0, 20) : '';
     const order = {
@@ -288,6 +296,12 @@ function createApp(config = loadConfig()) {
         }
         throw new HttpError(404, 'NOT_FOUND', '존재하지 않는 API입니다.');
       }
+      if (url.pathname === '/ads.txt') {
+        // 애드센스 승인/수익 보호용 판매자 선언 파일
+        if (!config.adsenseClient) throw new HttpError(404, 'NOT_FOUND', 'ads.txt 없음');
+        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+        return res.end(`google.com, ${config.adsenseClient.replace(/^ca-/, '')}, DIRECT, f08c47fec0942fa0\n`);
+      }
       if (req.method !== 'GET' && req.method !== 'HEAD') throw new HttpError(405, 'METHOD_NOT_ALLOWED', '허용되지 않는 요청입니다.');
       serveStatic(req, res, url.pathname);
     } catch (e) {
@@ -304,7 +318,7 @@ if (require.main === module) {
   const config = loadConfig();
   const { server, store } = createApp(config);
   server.listen(config.port, () => {
-    console.log(`IQ test server: http://localhost:${config.port}  (payment: ${config.provider}, price: ₩${config.price})`);
+    console.log(`IQ test server: http://localhost:${config.port}  (payment: ${config.provider}${config.provider === 'none' ? '' : `, price: ₩${config.price}`}, adsense: ${config.adsenseClient || 'off'})`);
   });
   const shutdown = () => {
     store.flush();
