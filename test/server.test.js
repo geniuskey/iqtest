@@ -2,9 +2,9 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
-const { createApp, loadConfig } = require('../server');
-const { generateTest } = require('../lib/puzzles');
-const { toIq, teaserBucket } = require('../lib/scoring');
+const { createApp, loadConfig } = require('../server/server');
+const { generateTest } = require('../core/puzzles');
+const { toIq, teaserBucket } = require('../core/scoring');
 
 function startServer(overrides = {}) {
   const config = { ...loadConfig({}), dataFile: null, port: 0, ...overrides };

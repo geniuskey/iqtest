@@ -5,8 +5,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const { generateTest, toPublic, renderCell, SCHEDULE, OPTION_COUNT } = require('./lib/puzzles');
-const { grade, toIq, teaserBucket, classify } = require('./lib/scoring');
+const { generateTest, toPublic, renderCell, SCHEDULE, OPTION_COUNT } = require('../core/puzzles');
+const { grade, toIq, teaserBucket, classify } = require('../core/scoring');
 const { Store } = require('./lib/store');
 const { createPaymentProvider } = require('./lib/payment');
 

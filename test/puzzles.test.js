@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
-const { generateTest, renderCell, keyOf, SCHEDULE, OPTION_COUNT } = require('../lib/puzzles');
+const { generateTest, renderCell, keyOf, SCHEDULE, OPTION_COUNT } = require('../core/puzzles');
 
 test('같은 시드는 같은 시험지를 만든다', () => {
   assert.deepStrictEqual(generateTest(42), generateTest(42));

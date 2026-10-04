@@ -1,3 +1,8 @@
+// 브라우저(<script>)와 Node(require) 양쪽에서 쓰는 공용 모듈 (UMD)
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else (root.IQCore = root.IQCore || {}).rng = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
 'use strict';
 
 // 시드 기반 난수 생성기 (mulberry32) — 같은 시드면 항상 같은 문제가 재현된다.
@@ -23,4 +28,5 @@ function createRng(seed) {
   return next;
 }
 
-module.exports = { createRng };
+return { createRng };
+});
