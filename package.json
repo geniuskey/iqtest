@@ -1,0 +1,15 @@
+{
+  "name": "iqtest",
+  "version": "1.0.0",
+  "private": true,
+  "description": "레이븐 행렬 방식 온라인 IQ 테스트 — 무료 순위 공개 + 유료 정밀 리포트",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
