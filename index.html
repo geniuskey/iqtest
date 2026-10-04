@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>IQ 테스트 — 30문항 행렬 추론 지능검사</title>
+  <meta name="description" content="30개의 시각 패턴 문제로 나의 지능지수(IQ)를 측정해 보세요. 25분, 무료로 응시하고 내 순위를 바로 확인할 수 있습니다." />
+  <meta property="og:title" content="나의 IQ는 몇일까? — 25분 IQ 테스트" />
+  <meta property="og:description" content="30개의 패턴 문제를 풀고 상위 몇 %인지 확인해 보세요." />
+  <meta name="theme-color" content="#4f46e5" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/">
+      <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#4f46e5"/><g fill="#fff"><circle cx="10" cy="10" r="3"/><rect x="19" y="7" width="6" height="6" rx="1"/><polygon points="10,19 13.5,25 6.5,25"/><text x="22" y="26" font-size="10" font-weight="700" text-anchor="middle" font-family="sans-serif">?</text></g></svg>
+      <span>IQ<b>Matrix</b></span>
+    </a>
+    <div id="topbar-slot"></div>
+  </header>
+  <main id="app" aria-live="polite"></main>
+  <div id="modal-root"></div>
+  <footer class="footer">
+    <p>본 테스트는 레이븐 누진행렬 방식의 문제로 구성된 온라인 추정 검사이며, 임상 지능검사(K-WAIS 등)를 대체하지 않습니다.</p>
+    <p><a href="#/privacy">개인정보처리방침</a> · © IQMatrix</p>
+  </footer>
+  <script src="config.js"></script>
+  <script src="core/rng.js"></script>
+  <script src="core/puzzles.js"></script>
+  <script src="core/scoring.js"></script>
+  <script src="core/result.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

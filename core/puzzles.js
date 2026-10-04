@@ -1,10 +1,15 @@
+// 브라우저(<script>)와 Node(require) 양쪽에서 쓰는 공용 모듈 (UMD)
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./rng'));
+  else (root.IQCore = root.IQCore || {}).puzzles = factory(root.IQCore.rng);
+})(typeof self !== 'undefined' ? self : this, function (rng) {
 'use strict';
 
 // 레이븐(Raven) 방식의 3x3 행렬 추론 문제 생성기.
 // 각 문제는 "셀 속성(attrs)" 9개로 이루어진 격자이고, 마지막 칸이 정답이다.
 // 오답 보기는 정답(또는 다른 오답)의 속성을 하나씩 바꿔서 만든다.
 
-const { createRng } = require('./rng');
+const { createRng } = rng;
 
 const SHAPES = ['circle', 'square', 'triangle', 'pentagon', 'hexagon', 'star', 'diamond', 'cross'];
 const FRAME_SHAPES = ['circle', 'square', 'triangle', 'pentagon', 'hexagon', 'diamond'];
@@ -665,7 +670,7 @@ const CATEGORIES = {
   logic: '논리 연산',
 };
 
-module.exports = {
+return {
   generateTest,
   toPublic,
   renderCell,
@@ -676,3 +681,4 @@ module.exports = {
   CATEGORIES,
   OPTION_COUNT,
 };
+});

@@ -1,6 +1,11 @@
+// 브라우저(<script>)와 Node(require) 양쪽에서 쓰는 공용 모듈 (UMD)
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./puzzles'));
+  else (root.IQCore = root.IQCore || {}).scoring = factory(root.IQCore.puzzles);
+})(typeof self !== 'undefined' ? self : this, function (puzzles) {
 'use strict';
 
-const { WEIGHTS, CATEGORIES } = require('./puzzles');
+const { WEIGHTS, CATEGORIES } = puzzles;
 
 // ---------------------------------------------------------------- 정규분포
 
@@ -114,4 +119,5 @@ function classify(iq) {
   return '낮음 (Low)';
 }
 
-module.exports = { grade, toIq, teaserBucket, classify, normCdf, normInv, PRIOR };
+return { grade, toIq, teaserBucket, classify, normCdf, normInv, PRIOR };
+});
